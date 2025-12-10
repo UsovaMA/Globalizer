@@ -285,6 +285,40 @@ endif()
 
 add_library(${GLOBALIZER_LIB_NAME} STATIC ${ALL_SRC_FILES} ${GCGEN_SOURCES} ${GCGEN_HEADERS})
 
+if (${GLOBALIZER_PYTHON_WITHOUT_ANACONDA})
+  
+  # Включаем модуль FindPython
+  find_package(Python REQUIRED COMPONENTS Development)
+
+  
+  # Проверяем успешность поиска
+  if(NOT Python_FOUND)
+    message(FATAL_ERROR "Python not found!")
+  else()
+    message("Python FOUND!")
+  endif()
+
+  # Добавляем найденные include директории
+
+  string(REGEX REPLACE "/Include$" "/include" Python_INCLUDE_DIRS ${Python_INCLUDE_DIRS})
+  message("Python Include Dirs: ${Python_INCLUDE_DIRS}")
+  
+  string(REGEX REPLACE ";" "\n" LIB_LIST_STRING "${Python_LIBRARIES}")
+  separate_arguments(LIB_LIST NATIVE_COMMAND ${LIB_LIST_STRING})
+  message("${LIB_LIST}")
+  list(GET LIB_LIST 1 OPTIMIZED_LIB)
+  message("${OPTIMIZED_LIB}")
+  get_filename_component(Python_LIBRARY_DIR "${OPTIMIZED_LIB}" DIRECTORY)
+  message("Python Libs Dirs: ${Python_LIBRARY_DIR}")
+
+  # Подключаем найденные библиотеки
+  #target_link_libraries(${GLOBALIZER_LIB_NAME} PUBLIC ${Python_LIBRARY_DIR})
+  
+  target_include_directories(${GLOBALIZER_LIB_NAME} PUBLIC ${Python_INCLUDE_DIRS})
+  
+endif()
+
+
 file(GLOB main_list "${GLOBALIZER_EXAMPLES_SRC_DIR}/*.cpp")
 
 
