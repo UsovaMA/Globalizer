@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from components.GlobalizerDashboard import StaticDashboard
+from components.static_dashboard import StaticDashboard
 
 
 def main():

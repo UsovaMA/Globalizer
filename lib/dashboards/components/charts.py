@@ -286,23 +286,6 @@ def calculate_data(xaxis_column_name, yaxis_column_name, calc,
         yi = np.linspace(bounds_y[0], bounds_y[1], 150)
         xi, yi = np.meshgrid(xi, yi)
         Z = interp(xi, yi)
-        '''
-        #else:
-        #    xi = np.linspace(bounds_x[0], bounds_x[1], 150)
-        #    yi = np.linspace(bounds_y[0], bounds_y[1], 150)
-        #   X, Y = np.meshgrid(xi, yi)
-        #   Z = griddata((x, y), z, (X, Y), method='cubic')  # "nearest", "linear", "natural", and "cubic" methods
-        
-        points = [list(x), list(y)]
-        points = list(map(list, zip(*points)))
-
-        interp = interpolate.Rbf(*zip(*points), z)
-        
-        xi = np.linspace(bounds_x[0], bounds_x[1], 150)
-        yi = np.linspace(bounds_y[0], bounds_y[1], 150)
-        xi, yi = np.meshgrid(xi, yi)
-        Z = interp(xi, yi)
-        '''
 
     elif calc == 'аппроксимация':
         nn = MLPRegressor(
@@ -334,7 +317,7 @@ def calculate_data(xaxis_column_name, yaxis_column_name, calc,
     x_noncomput = []
     y_noncomput = []
     '''
-    
+
     x_unaccept = []
     y_unaccept = []
 
