@@ -1,0 +1,16 @@
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 16rem;
+    padding: 1rem;
+    font-size: 1.1em;
+    background-color: #333333;
+}
+
+.content {
+    margin-left: 8%;
+    margin-right: 8%;
+    font-size: 1.1em;
+}

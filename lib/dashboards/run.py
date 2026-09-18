@@ -1,6 +1,8 @@
-from GlobalizerDashboard import StaticDashboard
 import argparse
 import sys
+
+from components.GlobalizerDashboard import StaticDashboard
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -23,6 +25,6 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Ошибка: укажите путь к JSON-файлу с данными для дашборда.")
         print(f"Использование: python {sys.argv[0]} <имя_файла.json>")
-        exit(1)
+        sys.exit(1)
 
     main()
