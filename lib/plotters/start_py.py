@@ -1,7 +1,9 @@
+import argparse
+import os
+from datetime import datetime
+
 from interface_cpp import DrawingProcess
 
-import argparse
-from datetime import datetime
 
 def parse_args():
     ap = argparse.ArgumentParser()
@@ -25,7 +27,7 @@ def parse_args():
         "-pfn",
         "--PlotFileName",
         type=str,
-        default=datetime.now().strftime("plotter_%Y_%d_%m_%H_%M_%S.png"),
+        default=datetime.now().astimezone().strftime("plotter_%Y_%d_%m_%H_%M_%S.png"),
         help="The name of the file to save the image."
     )
     ap.add_argument(
@@ -161,51 +163,51 @@ def read_args():
 
     if (args["SourceFilesPath"] is None) or (args["TrialsFileName"] is None) or (args["ProblemFileName"] is None):
         raise ValueError("The required arguments SourceFilesPath, TrialsFileName, and ProblemFileName are missing.")
+    
+    path = str(args["SourceFilesPath"])
+    trials_file_name = str(args["TrialsFileName"])
+    problem_file_name = str(args["ProblemFileName"])
+    output_file_name = str(args["PlotFileName"])
 
+    eps = float(args["Epsilon"])
+
+    types_names_map = {
+        "LevelLayers": "lines layers",
+        "Surface": "surface",
+        "ObjectiveFunction": "objective function",
+        "Approximation": "approximation",
+        "Interpolation": "interpolation",
+        "ByPoints": "by points",
+        "OnlyPoints": "only points"
+    }
+
+    plot_type = str(args["FigureType"])
+    plot_type = types_names_map.get(plot_type)
+
+    obj_func_type = str(args["CalcsType"])
+    obj_func_type = types_names_map.get(obj_func_type)
+
+    constraints_type = str(args["CalcsTypeC"])
+    constraints_type = types_names_map.get(constraints_type)
+
+    levels = int(args["Levels"])
+
+    grid_obj = int(args["ObjectiveGridSize"])
+    grid_c = int(args["ConstraintsGridSize"])
+
+    bounds = str(args["Bounds"])
+
+    displacement_of_points = bool(args["PointsBelowGraph"])
+    figure_show = bool(args["ShowFigure"])
+    hide_trials_points = bool(args["HideTrialsPoints"])
+    fill_feasible_region = bool(args["FillFeasibleRegion"])
+
+    is_1D = bool(args["1D"])
+
+    if is_1D:
+        params = list({int(args["x1"])})
     else:
-        path = str(args["SourceFilesPath"])
-        if not path.endswith("/"):
-            path += "/"
-        trials_file_name = str(args["TrialsFileName"])
-        problem_file_name = str(args["ProblemFileName"])
-        output_file_name = str(args["PlotFileName"])
-
-        eps = float(args["Epsilon"])
-
-        types_names_map = {
-            "LevelLayers": "lines layers",
-            "Surface": "surface",
-            "ObjectiveFunction": "objective function",
-            "Approximation": "approximation",
-            "Interpolation": "interpolation",
-            "ByPoints": "by points",
-            "OnlyPoints": "only points"
-        }
-
-        plot_type = str(args["FigureType"])
-        plot_type = types_names_map.get(plot_type)
-
-        obj_func_type = str(args["CalcsType"])
-        obj_func_type = types_names_map.get(obj_func_type)
-
-        levels = int(args["Levels"])
-
-        grid_obj = int(args["ObjectiveGridSize"])
-        grid_c = int(args["ConstraintsGridSize"])
-
-        bounds = str(args["Bounds"])
-
-        displacement_of_points = bool(args["PointsBelowGraph"])
-        figure_show = bool(args["ShowFigure"])
-        hide_trials_points = bool(args["HideTrialsPoints"])
-        fill_feasible_region = bool(args["FillFeasibleRegion"])
-
-        is_1D = bool(args["1D"])
-
-        if is_1D:
-            params = list({int(args["x1"])})
-        else:
-            params = list({int(args["x1"]), int(args["x2"])})
+        params = list({int(args["x1"]), int(args["x2"])})
 
 
     return (
@@ -216,6 +218,7 @@ def read_args():
         eps,
         plot_type,
         obj_func_type,
+        constraints_type,
         params,
         levels,
         grid_obj,
@@ -229,7 +232,7 @@ def read_args():
 
 if __name__ == "__main__":
     (path, trials_file_name, problem_file_name, output_file_name,
-     eps, plot_type, obj_func_type, params, levels, grid_obj, grid_c,
+     eps, plot_type, obj_func_type, constraints_type, params, levels, grid_obj, grid_c,
      displacement_of_points, figure_show, hide_trials_points, fill_feasible_region, bounds) = read_args()
 
     print(f"""
@@ -244,6 +247,7 @@ if __name__ == "__main__":
     ObjectiveGridSize: {grid_obj}
     ConstraintsGridSize: {grid_c}
     ObjFuncType: {obj_func_type}
+    ConstraintsType: {constraints_type}
     Params: {params}
     DisplacementOfPoints: {displacement_of_points}
     FigureShow: {figure_show}
@@ -252,7 +256,7 @@ if __name__ == "__main__":
     Bounds: {bounds}
     """)
 
-    filename = path + problem_file_name
+    filename = os.path.join(path, problem_file_name)
 
     if bounds:
         lines = ""
@@ -275,6 +279,7 @@ if __name__ == "__main__":
 
     dp.draw_plot(plotter_type=plot_type,
                  object_function_plotter_type=obj_func_type,
+                 constraints_plotter_type=constraints_type,
                  parameters_numbers=params,
                  is_points_at_bottom=displacement_of_points,
                  output_file=output_file_name,
@@ -285,5 +290,3 @@ if __name__ == "__main__":
                  is_need_hide_trials_points=hide_trials_points,
                  is_need_fill_feasible_region=fill_feasible_region
                  )
-    
-    print(f"Picture was saved in {path + output_file_name}.")

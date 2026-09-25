@@ -1,9 +1,10 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import os
-from file_readers import ReadTrialsFile, ReadProblemFile
+
+import matplotlib.pyplot as plt
+import numpy as np
+
 from plotters import Plotter2D, Plotter3D
-from scipy import interpolate
+
 
 class Painter:
     """
@@ -52,11 +53,10 @@ class StaticPainter(Painter):
                  is_need_hide_no_feasible_points,
                  is_need_fill_feasible_region
     ):
-
         self.parameters_numbers = parameters_numbers
         self.eps = eps
         self.dim = dim
-
+        
         self.lb = [lb[param] for param in parameters_numbers]
         self.rb = [rb[param] for param in parameters_numbers]
         self.points = points
@@ -89,34 +89,31 @@ class StaticPainter(Painter):
 
         if self.dim > len(parameters_numbers):
             self.section_indexes = list(range(self.dim))
-            for number in self.parameters_numbers:
-                self.section_indexes.remove(number)
+            self.section_indexes = [
+                index for index in range(self.dim)
+                if index not in self.parameters_numbers
+            ]
 
-            for point, value in zip(self.points, self.values):
-                is_section_of_best_point = True
-                for index in self.section_indexes:
-                    if abs(point[index] - self.sol_point[index]) > self.eps:
-                        is_section_of_best_point = False
-                        break
-                if is_section_of_best_point:
-                    self.section_points.append(point)
-                    self.section_values.append(value)
+            section_points = [
+                (point, value)
+                for point, value in zip(self.points, self.values)
+                if self.is_section_point(point)
+            ]
 
-            self.points = self.section_points
-            self.values = self.section_values
+            self.points = [point for point, _ in section_points]
+            self.values = [value for _, value in section_points]
 
-            section_x_nce = []
+            '''
+            self.x_nc = [
+                point for point in self.x_nc
+                if self.is_section_point(point)
+            ]
+            '''
 
-            for x in self.x_nce:
-                is_section_of_best_point = True
-                for index in self.section_indexes:
-                    if abs(x[index] - self.sol_point[index]) > self.eps:
-                        is_section_of_best_point = False
-                        break
-                if is_section_of_best_point:
-                    section_x_nce.append(x)
-
-            self.x_nce = section_x_nce
+            self.x_nce = [
+                x for x in self.x_nce
+                if self.is_section_point(x)
+            ]
 
 
         if self.dim == 1 or len(self.parameters_numbers) == 1:
@@ -132,61 +129,117 @@ class StaticPainter(Painter):
                                      self.plotter_type,
                                      self.is_points_at_bottom)
 
+    def is_section_point(self, point):
+        return all(
+            abs(point[index] - self.sol_point[index]) <= self.eps
+            for index in self.section_indexes
+        )
+        
     def paint_objective_func(self):
-        #print(self.points, self.values)
+        is_uncalc = len(self.x_nce) > 0
         if len(self.parameters_numbers) == 1:
             if self.object_function_plotter_type == 'objective function':
                 self.plotter.plot_by_grid(self.x, self.z, transparency=0.9)
             elif self.object_function_plotter_type == 'interpolation':
-                self.plotter.plot_interpolation(self.points, self.values, points_count=self.grid_obj, transparency=0.9)
+                self.plotter.plot_interpolation(self.points, self.values, is_uncalc, points_count=self.grid_obj, transparency=0.9)
             elif self.object_function_plotter_type == 'approximation':
                 self.plotter.plot_approximation(self.points, self.values, points_count=self.grid_obj, transparency=0.9)
             elif self.object_function_plotter_type == 'by points':
                 self.plotter.plot_by_points(self.points, self.values, transparency=0.9)
-            elif self.object_function_plotter_type == 'only points':
-                pass
 
         else:
             if self.plotter_type == 'lines layers' or self.plotter_type == 'surface':
                 if self.object_function_plotter_type == "objective function":
                     self.plotter.plot_by_grid(self.x, self.z, levels=self.levels)
                 elif self.object_function_plotter_type == 'interpolation':
-                    self.plotter.plot_interpolation(self.points, self.values, points_count=self.grid_obj, levels=self.levels)
+                    self.plotter.plot_interpolation(self.points, self.values, is_uncalc, points_count=self.grid_obj, levels=self.levels)
                 elif self.object_function_plotter_type == 'approximation':
                     self.plotter.plot_approximation(self.points, self.values, points_count=self.grid_obj, levels=self.levels)
                 elif self.object_function_plotter_type == 'by points':
                     self.plotter.plot_by_points(self.points, self.values, levels=self.levels)
-                elif self.object_function_plotter_type == 'only points':
-                    pass
 
     def paint_constraints(self):
+        parameter_count = len(self.parameters_numbers)
+        constraint_count = len(self.c)
+        interpolated_constraint_count = len(self.cc) // 2
+
+        has_second_parameter = parameter_count > 1
+        has_interpolated_constraints = interpolated_constraint_count > 0
+        has_constraints = constraint_count > 0
+
+        if not has_second_parameter:
+            return
+        
         if not self.hatch:
-            if self.plotter_type != 'surface':
-                if self.constraints_plotter_type == "objective function":
-                    if len(self.parameters_numbers) > 1 and len(self.c) > 0:
-                        for i in range(len(self.c[0])):
-                            self.plotter.plot_by_grid(self.x, [cj[i] for cj in self.c], colormap='twilight', linewidths=1, levels=0, transparency=0.6)
-                elif self.constraints_plotter_type == 'interpolation':
-                    if len(self.parameters_numbers) > 1 and len(self.cc[0]) > 0:
-                        for i in range(len(self.cc) // 2):
-                            self.plotter.plot_interpolation(self.cc[2 * i], self.cc[2 * i + 1], points_count=self.grid_c,
-                                                            colormap='twilight', linewidths=1, transparency=0.6, levels=0)
-        else:
+            if self.plotter_type == 'surface':
+                return
+            
             if self.constraints_plotter_type == "objective function":
-                if len(self.parameters_numbers) > 1 and len(self.c) > 0:
-                    x1 = [xi[0] for xi in self.x]
-                    x2 = [xi[1] for xi in self.x]
-                    self.plotter.plot_hatch_by_grid(x1, x2, self.c)
-            elif self.constraints_plotter_type == 'interpolation':
-                if len(self.parameters_numbers) > 1 and len(self.cc[0]) > 0:
-                    x1 = []
-                    x2 = []
-                    z = []
-                    for i in range(len(self.cc) // 2):
-                        x1.append(np.array(self.cc[2 * i])[:, self.parameters_numbers[0]])
-                        x2.append(np.array(self.cc[2 * i])[:, self.parameters_numbers[1]])
-                        z.append(np.array(self.cc[2 * i + 1]))
-                    self.plotter.plot_hatch_by_interpolate(x1, x2, z, points_count=self.grid_c)
+                if not has_constraints:
+                    return
+                
+                for i in range(constraint_count):
+                    constraint_points = self.x
+                    constraint_values = [cj[i] for cj in self.c]
+                    self.plotter.plot_by_grid(
+                        constraint_points,
+                        constraint_values,
+                        colormap='twilight',
+                        linewidths=1,
+                        levels=0,
+                        transparency=0.6
+                    )
+                return
+                
+            if self.constraints_plotter_type != 'interpolation' or not has_interpolated_constraints:
+                return
+            
+            for i in range(interpolated_constraint_count):
+                constraint_points = self.cc[2 * i]
+                constraint_values = self.cc[2 * i + 1]
+                self.plotter.plot_interpolation(
+                    constraint_points,
+                    constraint_values,
+                    points_count=self.grid_c,
+                    colormap='twilight',
+                    linewidths=1,
+                    transparency=0.6,
+                    levels=0
+                )
+            return
+
+        if self.constraints_plotter_type == "objective function":
+            if not has_constraints:
+                return
+            
+            x1 = [xi[0] for xi in self.x]
+            x2 = [xi[1] for xi in self.x]
+            self.plotter.plot_hatch_by_grid(
+                x1, x2, self.c
+            )
+            return
+        
+        if self.constraints_plotter_type != 'interpolation' or not has_interpolated_constraints:
+            return
+        
+        x1 = []
+        x2 = []
+        z = []
+        first_parameter = self.parameters_numbers[0]
+        second_parameter = self.parameters_numbers[1]
+
+        for i in range(interpolated_constraint_count):
+            points_index = 2 * i
+            values_index = points_index + 1
+            constraint_points = np.array(self.cc[points_index])
+            constraint_values = np.array(self.cc[values_index])
+            x1.append(constraint_points[:, first_parameter])
+            x2.append(constraint_points[:, second_parameter])
+            z.append(constraint_values)
+
+        self.plotter.plot_hatch_by_interpolate(
+            x1, x2, z, points_count=self.grid_c
+        )
 
     def paint_points(self):
         flag1 = True
@@ -242,14 +295,13 @@ class StaticPainter(Painter):
         self.plotter.plot_points([point], [value], clr='red', mrkrs=6, mrkr='*')
 
     def save_image(self, path, filename, is_need_show_figure):
-        if not os.path.isdir(path):
-            if path == "":
-                plt.savefig(filename)
-            else:
-                os.mkdir(path)
-                plt.savefig(path + filename)
-        else:
-            plt.savefig(path + "/" + filename)
+        output_directory = os.path.join(path or ".", "output")
+        os.makedirs(output_directory, exist_ok=True)
+
+        output_path = os.path.join(output_directory, filename)
+        plt.savefig(output_path)
+
+        print(f"Picture was saved in {output_path}.")
 
         if is_need_show_figure:
             plt.show()

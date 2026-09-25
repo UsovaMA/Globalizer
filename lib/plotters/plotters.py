@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.neural_network import MLPRegressor
 from scipy import interpolate
+from sklearn.neural_network import MLPRegressor
+
 
 class Plotter:
     """
@@ -11,28 +12,26 @@ class Plotter:
         """
         Отрисовка целевой функции с построением сетки в заданном сечении
         """
-        pass
+
     def plot_approximation(self):
         """
         Отрисовка целевой функции по поисковым испытаниям с использованием аппроксимации
         """
-        pass
+
     def plot_interpolation(self):
         """
         Отрисовка целевой функции по поисковым испытаниям с использованием интерполяции
         """
-        pass
+        
     def plot_by_points(self):
         """
         Отрисовка целевой функции по поисковым испытаниям с натягиванием графика на точки
         """
-        pass
 
     def plot_points(self):
         """
         Отрисовка точек поисковых испытаний
         """
-        pass
 
     #@property
     def figure_style_settings_setup(self):
@@ -52,61 +51,57 @@ class Plotter:
         rows = int(np.sqrt(total_points))
         cols = int(np.sqrt(total_points))
 
-        z = []
-        for i in range(len(zc[0])):
-            z.append(np.array([zcj[i] for zcj in zc]))
+        z = np.asarray(zc).T
 
-        xgrid = np.zeros((rows, cols))
-        ygrid = np.zeros((rows, cols))
+        xgrid = np.asarray(x1).reshape(rows, cols)
+        ygrid = np.asarray(x2).reshape(rows, cols)
 
-        for i in range(rows):
-            for j in range(cols):
-                idx = i * cols + j
-                xgrid[i, j] = x1[idx]
-                ygrid[i, j] = x2[idx]
-
-        zgrid = []
-        for k in range(len(z)):
-            zgrid.append(np.zeros((rows, cols)))
-            for i in range(rows):
-                for j in range(cols):
-                    idx = i * cols + j
-                    zgrid[k][i, j] = z[k][idx]
+        zgrid = np.asarray(z).reshape(len(z), rows, cols)
 
         for k in range(len(z)):
             self.ax.contour(xgrid, ygrid, zgrid[k], colors=["#393a398f"], linewidths=1, levels=[0])
 
-        mask = (zgrid[0] <= 0)
-        for k in range(len(zgrid) - 1):
-            mask &= (zgrid[k + 1] <= 0)
+        mask = np.all(zgrid <= 0, axis=0)
+
         self.ax.contourf(xgrid, ygrid, mask.astype(float), levels=[0.5, 1.0], alpha=0.6, colors=["#00ff483e"])
 
     def plot_hatch_by_interpolate(self, x1, x2, zc, points_count=200):
         interp = []
-        #try:
-        for i in range(len(zc)):
-            interp.append(interpolate.Rbf(x1[i],
-                                          x2[i],
-                                          zc[i]))
-        #except Exception as err:
-        #    print(f"\033[33m\nWARNING: the graph is plotted without displaying the constraints!\n\n\
-        #           The trials number is too large to plot using Rbf-interpolation.\n\n\
-        #           Possible solutions:\n\
-        #          - Reduce the number of points to plot.\n\
-        #          Original error text of scipy.interpolate.Rbf:\n\
-        #          {err}\n\n\033[0m")
-        #   return
+        try:
+            interp = [
+                interpolate.Rbf(x1[i], x2[i], zc[i])
+                for i in range(len(zc))
+            ]
+
+        except Exception as err:   # noqa: BLE001
+            print(f"""
+\033[33m
+WARNING: the graph is plotted without displaying the constraints!
+
+The constraints could not be interpolated using Rbf.
+
+Possible solutions:
+- Reduce the number of points to plot.
+- Check for duplicate or invalid points.
+
+Original error text of scipy.interpolate.Rbf:
+{err}
+\033[0m
+"""
+            )
+            return
 
         xgrid = np.linspace(self.leftBounds[0], self.rightBounds[0], points_count)
         ygrid = np.linspace(self.leftBounds[1], self.rightBounds[1], points_count)
         xgrid, ygrid = np.meshgrid(xgrid, ygrid)
 
-        zgrid = []
-        for i in range(len(zc)):
-            zgrid.append(interp[i](xgrid, ygrid))
+        zgrid = [
+            interpolation(xgrid, ygrid)
+            for interpolation in interp
+        ]
 
-        for k in range(len(zgrid)):
-            self.ax.contour(xgrid, ygrid, zgrid[k], colors=["#393a398f"], linewidths=1, levels=[0])
+        for grid in zgrid:
+            self.ax.contour(xgrid, ygrid, grid, colors=["#393a398f"], linewidths=1, levels=[0])
 
         mask = (zgrid[0] <= 0)
         for k in range(len(zgrid) - 1):
@@ -115,7 +110,7 @@ class Plotter:
         self.ax.contourf(xgrid, ygrid, mask.astype(float), levels=[0.5, 1.0], alpha=0.6, colors=["#00ff483e"])
 
     def plot_contourf(self, x1, x2, z, colormap, levels):
-        c = self.ax.contourf(x1, x2, z, cmap=colormap, levels=levels)
+        self.ax.contourf(x1, x2, z, cmap=colormap, levels=levels)
 
     def plot_surface(self, x1, x2, z, colormap, transparency):
         self.ax.plot_surface(x1, x2, z, cmap=colormap, alpha=transparency)
@@ -157,20 +152,22 @@ class Plotter2D(Plotter):
                           max_iter=5000,
                           tol=10e-8,
                           random_state=None)
-
-        nn.fit(np.array(points), np.array(values))
+        
+        continous_points = np.array(points)[:, 0]
+        nn.fit(continous_points.reshape(-1, 1), np.array(values))
         x = np.linspace(self.leftBound, self.rightBound, points_count)
         z = nn.predict(x[:, np.newaxis])
         self.plot_line(x, z, linecolor, linewidth, transparency)
 
-    def plot_interpolation(self, points, values, points_count=100, linecolor='black', linewidth=1, transparency=0.7):
+    def plot_interpolation(self, points, values, is_uncalc, points_count=100, linecolor='black', linewidth=1, transparency=0.7):
         continous_points = np.array(points)[:, 0]
         x = np.linspace(min(continous_points), max(continous_points), points_count)
         z = interpolate.interp1d(continous_points.flatten(), np.array(values).flatten(), kind=3)(x)
         self.plot_line(x, z, linecolor, linewidth, transparency)
 
     def plot_by_points(self, points, values, linecolor='black', linewidth=1, transparency=0.7):
-        x, z = zip(*sorted(zip(np.array(points).flatten(), values)))
+        continous_points = np.array(points)[:, 0]
+        x, z = zip(*sorted(zip(continous_points.flatten(), values)))
         self.plot_line_pulling_on_points(x, z, linecolor, linewidth, transparency)
 
     def plot_points(self, points, values, clr='blue', mrkr='o', mrkrs=4):
@@ -211,21 +208,23 @@ class Plotter3D(Plotter):
 
         total_points = len(x1)
         #assert total_points == rows * cols, f"Ошибка: Ожидалось {rows * cols} точек, а найдено {total_points}."
-        rows = int(np.sqrt(total_points))
-        cols = int(np.sqrt(total_points))
-        xgrid = np.zeros((rows, cols))
-        ygrid = np.zeros((rows, cols))
-        zgrid = np.zeros((rows, cols))
+        grid_size = int(np.sqrt(total_points))
 
-        for i in range(rows):
-            for j in range(cols):
-                idx = i * cols + j
-                xgrid[i, j] = x1[idx]
-                ygrid[i, j] = x2[idx]
-                zgrid[i, j] = z[idx]
+        if grid_size ** 2 != total_points:
+            raise ValueError(
+                f"Для построения регулярной сетки количество точек \
+                должно быть полным квадратом ({grid_size ** 2}), получено: {total_points}"
+            )
+        
+        rows = grid_size
+        cols = grid_size
+
+        xgrid = np.array(x1).reshape(rows, cols)
+        ygrid = np.array(x2).reshape(rows, cols)
+        zgrid = np.array(z).reshape(rows, cols)
 
         if self.plotterType == 'lines layers':
-            self.plot_contour(xgrid, ygrid, zgrid, colormap=colormap, linewidths=linewidths, levels=levels)
+            self.plot_contour(xgrid, ygrid, zgrid, colormap=colormap, levels=levels, linewidths=linewidths)
         elif self.plotterType == 'surface':
             self.plot_surface(xgrid, ygrid, zgrid, colormap=colormap, transparency=transparency)
 
@@ -256,24 +255,163 @@ class Plotter3D(Plotter):
         elif self.plotterType == 'surface':
             self.plot_surface(x1, x2, z, colormap=colormap, transparency=transparency)
 
-    def plot_interpolation(self, points, values, points_count=100,
+    def plot_interpolation(self, points, values, is_uncalc, points_count=100,
                            colormap=plt.cm.viridis, transparency=0.6, linewidths=1, levels=25):
-        try:
-            interp = interpolate.Rbf(np.array(points)[:, self.indexes[0]], np.array(points)[:, self.indexes[1]], values)
-        except Exception as err:
-            print(f"\033[33m\nWARNING: the graph is plotted without displaying the objective function!\n\n\
-The trials number is too large to plot a 3D graph using Rbf-interpolation.\n\n\
-Possible solutions:\n\
-- Reduce the number of points to plot.\n\
-- Use the mode \'ByPoints\' to plot surface.\n\
-Original error text of scipy.interpolate.Rbf:\n\
-{err}\n\n\033[0m")
-            return
+        if is_uncalc:
+            points = np.asarray(points, dtype=float)
+            values = np.asarray(values, dtype=float)
 
-        x1 = np.linspace(self.leftBounds[0], self.rightBounds[0], points_count)
-        x2 = np.linspace(self.leftBounds[1], self.rightBounds[1], points_count)
-        x1, x2 = np.meshgrid(x1, x2)
-        z = interp(x1, x2)
+            source_points = points[:, self.indexes]
+            valid = (
+                np.isfinite(source_points).all(axis=1)
+                & np.isfinite(values)
+            )
+            source_points = source_points[valid]
+            values = values[valid]
+
+            unique_points, unique_indices = np.unique(
+                source_points,
+                axis=0,
+                return_index=True
+            )
+            source_points = unique_points
+            values = values[unique_indices]
+            try:
+                interp = interpolate.Rbf(
+                    source_points[:, 0], #points[:, self.indexes[0]],
+                    source_points[:, 1], #points[:, self.indexes[1]],
+                    values
+                )
+            except Exception as err: # noqa: BLE001
+                print(f"""
+\033[33m
+WARNING: the graph is plotted without displaying the objective function!
+
+
+The trials number is too large to plot a 3D graph using Rbf-interpolation.
+
+
+Possible solutions:
+- Reduce the number of points to plot.
+- Use the mode \'ByPoints\' to plot surface.
+- Check for duplicate or invalid points.
+
+Original error text of scipy.interpolate.Rbf:
+{err}
+\033[0m
+"""
+                )
+                return
+
+            x1 = np.linspace(self.leftBounds[0], self.rightBounds[0], points_count)
+            x2 = np.linspace(self.leftBounds[1], self.rightBounds[1], points_count)
+            x1, x2 = np.meshgrid(x1, x2)
+            #z = interp(x1, x2)
+
+            grid_points = np.column_stack((x1.ravel(), x2.ravel()))
+            z = interp(grid_points[:, 0], grid_points[:, 1])
+
+            try:
+                import matplotlib.tri as mtri
+
+                triangulation = mtri.Triangulation(
+                    source_points[:, 0],
+                    source_points[:, 1]
+                )
+                triangles = triangulation.triangles
+
+                edge_lengths = np.column_stack((
+                    np.hypot(
+                        source_points[triangles[:, 0], 0]
+                        - source_points[triangles[:, 1], 0],
+                        source_points[triangles[:, 0], 1]
+                        - source_points[triangles[:, 1], 1]
+                    ),
+                    np.hypot(
+                        source_points[triangles[:, 1], 0]
+                        - source_points[triangles[:, 2], 0],
+                        source_points[triangles[:, 1], 1]
+                        - source_points[triangles[:, 2], 1]
+                    ),
+                    np.hypot(
+                        source_points[triangles[:, 2], 0]
+                        - source_points[triangles[:, 0], 0],
+                        source_points[triangles[:, 2], 1]
+                        - source_points[triangles[:, 0], 1]
+                    )
+                ))
+
+                nearest_distances = np.min(
+                    np.where(
+                        np.eye(len(source_points), dtype=bool),
+                        np.inf,
+                        np.linalg.norm(
+                            source_points[:, None] - source_points[None, :],
+                            axis=2
+                        )
+                    ),
+                    axis=1
+                )
+
+                triangle_nearest_distances = nearest_distances[triangles]
+
+                local_max_edge_lengths = 6 * np.max(
+                    triangle_nearest_distances,
+                    axis=1
+                )
+
+                triangulation.set_mask(
+                    np.any(
+                        edge_lengths > local_max_edge_lengths[:, np.newaxis],
+                        axis=1
+                    )
+                )
+
+                triangle_index = triangulation.get_trifinder()(
+                    grid_points[:, 0],
+                    grid_points[:, 1]
+                )
+                z[triangle_index < 0] = np.nan
+            except Exception:  # noqa: BLE001
+                pass
+
+            z = z.reshape(points_count, points_count)
+
+        else:
+            points = np.asarray(points)
+            values = np.asarray(values)
+
+            try:
+                interp = interpolate.Rbf(
+                    points[:, self.indexes[0]],
+                    points[:, self.indexes[1]],
+                    values
+                )
+            except Exception as err: # noqa: BLE001
+                print(f"""
+\033[33m
+WARNING: the graph is plotted without displaying the objective function!
+
+
+The trials number is too large to plot a 3D graph using Rbf-interpolation.
+
+
+Possible solutions:
+- Reduce the number of points to plot.
+- Use the mode \'ByPoints\' to plot surface.
+- Check for duplicate or invalid points.
+
+Original error text of scipy.interpolate.Rbf:
+{err}
+\033[0m
+"""
+                )
+                return
+
+            x1 = np.linspace(self.leftBounds[0], self.rightBounds[0], points_count)
+            x2 = np.linspace(self.leftBounds[1], self.rightBounds[1], points_count)
+            x1, x2 = np.meshgrid(x1, x2)
+            z = interp(x1, x2)
 
         if self.plotterType == 'lines layers':
             self.plot_contour(x1, x2, z, colormap=colormap, linewidths=linewidths, levels=levels)

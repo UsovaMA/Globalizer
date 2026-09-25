@@ -1,22 +1,31 @@
+import os
+import sys
 from ctypes import *
-import sys, os
+
 sys.path.append(os.path.dirname(sys.argv[0]))
 
+from file_readers import ProblemReader, TrialReader
 from painters import StaticPainter
-from file_readers import ReadTrialsFile, ReadProblemFile
+
 
 class DrawingProcess:
     def __init__(self,  build_path, trials_file_name, problem_file_name, eps):
         self.path = build_path
         self.eps = eps
-        self.dim, self.lb, self.rb, self.x, self.z, self.c = ReadProblemFile(build_path, problem_file_name)
-        self.points, self.values, self.sol_point, self.sol_value, self.x_nc, self.z_nc, self.cc, self.x_nce = ReadTrialsFile(build_path, trials_file_name)
+
+        problem_reader = ProblemReader(build_path, problem_file_name)
+        problem_data = problem_reader.load()
+        self.dim, self.lb, self.rb, self.x, self.z, self.c = problem_data
+
+        trial_reader = TrialReader(build_path, trials_file_name)
+        trials_data = trial_reader.load()
+        self.points, self.values, self.sol_point, self.sol_value, self.x_nc, self.z_nc, self.cc, self.x_nce = trials_data
 
     def draw_plot(self,
                   plotter_type=None,
-                  object_function_plotter_type="objective function",
-                  constraints_plotter_type="objective function",
-                  parameters_numbers=[0],
+                  object_function_plotter_type="interpolation",
+                  constraints_plotter_type="interpolation",
+                  parameters_numbers=None,
                   is_points_at_bottom=True,
                   output_file="output.png",
                   levels=25,
@@ -33,6 +42,9 @@ class DrawingProcess:
         'lines layers' + 'approximation', 'lines layers' + 'by points'- не желательно
         'surface' + 'objective function' - визуализирует в объеме линии уровня вместо поверхности
         '''
+        if parameters_numbers is None:
+            parameters_numbers = [0]
+
         painter = StaticPainter(parameters_numbers,
                                 self.eps,
                                 self.dim,
@@ -58,6 +70,7 @@ class DrawingProcess:
                                 is_points_at_bottom,
                                 is_need_hide_no_feasible_points,
                                 is_need_fill_feasible_region)
+
         painter.paint_objective_func()
         painter.paint_constraints()
         if not is_need_hide_trials_points:
